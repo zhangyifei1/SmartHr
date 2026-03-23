@@ -2,6 +2,7 @@
 
 ## 项目简介
 SmartHr是一个智能化的人力资源招聘管理平台，连接求职者、企业和平台管理者三方，通过AI技术赋能招聘全流程，提升求职效率和招聘质量。
+<video src="./docs/20260323-140229.mp4" controls></video>
 
 ## 技术栈
 ### 后端
@@ -97,7 +98,7 @@ npm install
 npm run dev
 ```
 
-<video src="./docs/20260323-140229.mp4" controls></video>
+
 前端服务启动后访问：http://localhost:3000
 
 ## 核心功能
