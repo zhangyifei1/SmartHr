@@ -97,6 +97,7 @@ npm install
 npm run dev
 ```
 
+<video src="./docs/20260323-140229.mp4" controls></video>
 前端服务启动后访问：http://localhost:3000
 
 ## 核心功能
