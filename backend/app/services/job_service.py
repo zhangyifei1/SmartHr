@@ -158,16 +158,36 @@ class JobService:
         applications = query.order_by(JobApplication.created_at.desc()).offset(offset).limit(page_size).all()
 
         # 补充岗位和企业信息
+        result = []
         for app in applications:
             job = db.query(Job).filter(Job.id == app.job_id).first()
             if job:
-                app.job_title = job.title
                 enterprise = db.query(EnterpriseProfile).filter(EnterpriseProfile.id == job.enterprise_id).first()
-                if enterprise:
-                    app.company_name = enterprise.company_name
-                    app.company_logo = enterprise.company_logo
 
-        return applications, total
+                # 构建返回数据，字段名与前端对齐
+                app_data = {
+                    "id": app.id,
+                    "job_id": app.job_id,
+                    "jobseeker_id": app.jobseeker_id,
+                    "resume_id": app.resume_id,
+                    "status": app.status,
+                    "created_at": app.created_at.isoformat() if app.created_at else None,
+                    "updated_at": app.updated_at.isoformat() if app.updated_at else None,
+                    # 岗位信息
+                    "job_title": job.title,
+                    "salary_min": float(job.salary_min) if job.salary_min else 0,
+                    "salary_max": float(job.salary_max) if job.salary_max else 0,
+                    "work_city": job.work_city,
+                    # 企业信息
+                    "enterprise_name": enterprise.company_name if enterprise else "",
+                    "company_name": enterprise.company_name if enterprise else "",
+                    "company_logo": enterprise.company_logo if enterprise else "",
+                    # 投递时间
+                    "apply_time": app.created_at.strftime("%Y-%m-%d %H:%M") if app.created_at else ""
+                }
+                result.append(app_data)
+
+        return result, total
 
     @staticmethod
     def calculate_match_score(db: Session, job_id: int, resume_id: int) -> dict:
@@ -249,7 +269,7 @@ class JobService:
             from app.services.volcengine_service import volcengine_ai_service
             messages = [{"role": "user", "content": prompt}]
             # 在同步方法中运行异步调用
-            result = asyncio.run(volcengine_ai_service._chat_completion(messages, temperature=0.1))
+            result = asyncio.run(volcengine_ai_service._chat_completion(messages, temperature=0.7))
 
             # 解析JSON结果
             match_result = json.loads(result)
@@ -294,3 +314,42 @@ class JobService:
                 "reference_answer": "可以通过依赖注入的方式，在路由中添加权限校验依赖，验证用户的JWT token和角色权限。"
             }
         ]
+
+    @staticmethod
+    def generate_interview_preparation(db: Session, job_id: int) -> dict:
+        """生成面试准备：10个面试问题、参考答案和知识点梳理"""
+        import asyncio
+        from app.services.volcengine_service import volcengine_ai_service
+
+        job = JobService.get_job_detail(db, job_id, increase_view=False)
+
+        job_content = {
+            "title": job.title,
+            "job_description": job.job_description,
+            "job_requirement": job.job_requirement,
+            "salary_min": job.salary_min,
+            "salary_max": job.salary_max,
+            "education_requirement": job.education_requirement,
+            "work_year_requirement": job.work_year_requirement
+        }
+
+        try:
+            result = asyncio.run(volcengine_ai_service.generate_interview_preparation(job_content))
+            return result
+        except Exception as e:
+            print(f"AI生成面试准备失败: {str(e)}")
+            # 返回模拟数据
+            return {
+                "interview_questions": [
+                    {
+                        "question": "请简单介绍一下你自己？",
+                        "reference_answer": "可以从教育背景、工作经历、技能特长和职业规划几个方面简要介绍，控制在2-3分钟。",
+                        "key_points": ["自我介绍的结构", "时间控制", "重点突出"]
+                    },
+                    {
+                        "question": "你为什么对这个岗位感兴趣？",
+                        "reference_answer": "结合岗位要求和自己的职业规划，说明对公司和岗位的了解，以及自己为什么适合这个岗位。",
+                        "key_points": ["对公司的了解", "岗位匹配度", "职业规划"]
+                    }
+                ]
+            }

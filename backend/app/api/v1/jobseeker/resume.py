@@ -18,6 +18,7 @@ import docx
 from pdf2image import convert_from_path
 import io
 import datetime
+import subprocess
 
 router = APIRouter(prefix="/resumes", tags=["求职者-简历管理"])
 
@@ -74,17 +75,59 @@ def parse_date(date_str: str) -> datetime.date or None:
         print(f"日期解析失败: {date_str}, 错误: {e}")
     return None
 
-def extract_text_from_docx(file_path: str) -> str:
-    """从docx文件提取文本内容"""
-    text = ""
-    doc = docx.Document(file_path)
-    for para in doc.paragraphs:
-        text += para.text + "\n"
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                text += cell.text + "\n"
-    return text.strip()
+def word_to_pdf_aspose(word_path: str, pdf_path: str = None) -> str:
+    """使用Aspose.Words将Word文档转换为PDF，纯Python实现，无需Office"""
+    if pdf_path is None:
+        pdf_path = word_path.rsplit('.', 1)[0] + '.pdf'
+
+    try:
+        import aspose.words as aw
+
+        # 加载Word文档
+        doc = aw.Document(word_path)
+
+        # 保存为PDF
+        doc.save(pdf_path)
+
+        print(f"[Aspose.Word转PDF] 转换成功: {pdf_path}")
+        return pdf_path
+    except Exception as e:
+        print(f"[Aspose.Word转PDF] 失败: {str(e)}")
+        raise Exception(f"无法将Word转换为PDF: {str(e)}")
+
+
+def parse_word_with_vision(word_path: str) -> List[str]:
+    """将Word文档转为PDF再转为图片，返回base64图片列表"""
+    pdf_path = None
+    try:
+        # 1. Word转PDF - 使用Aspose.Words (纯Python，无需Office)
+        try:
+            pdf_path = word_to_pdf_aspose(word_path)
+        except Exception as e:
+            print(f"[Word视觉解析] Aspose转PDF失败: {str(e)}")
+            raise Exception(f"无法解析Word文档: {str(e)}")
+
+        # 2. PDF转图片
+        images = convert_pdf_to_images(pdf_path)
+
+        # 3. 清理临时PDF文件
+        try:
+            if pdf_path and os.path.exists(pdf_path):
+                os.remove(pdf_path)
+                print(f"[清理] 删除临时PDF: {pdf_path}")
+        except:
+            pass
+
+        return images
+    except Exception as e:
+        # 确保清理临时文件
+        try:
+            if pdf_path and os.path.exists(pdf_path):
+                os.remove(pdf_path)
+        except:
+            pass
+        print(f"[Word视觉解析] 失败: {str(e)}")
+        raise
 
 @router.get("", response_model=List[ResumeListItem], summary="获取简历列表")
 def get_resume_list(
@@ -208,16 +251,14 @@ async def upload_resume(
             if images:
                 parsed_result = await volcengine_ai_service.resume_parse(images=images)
                 print(f"[简历解析] PDF解析完成，耗时: {time.time() - start_time:.2f}秒")
-        elif ext == "docx":
-            print("[简历解析] 使用DOCX文本解析模式")
-            # docx文件提取文本解析
-            text_content = extract_text_from_docx(save_path)
-            print(f"[简历解析] DOCX文本提取完成，长度: {len(text_content)}字符")
-            if text_content:
-                parsed_result = await volcengine_ai_service.resume_parse(text_content=text_content)
-                print(f"[简历解析] DOCX解析完成，耗时: {time.time() - start_time:.2f}秒")
-        elif ext == "doc":
-            raise InvalidFileTypeException(message="暂不支持doc格式，请转换为docx后上传")
+        elif ext in ["docx", "doc"]:
+            print(f"[简历解析] 使用Word转图片多模态解析模式，格式: {ext}")
+            # Word文档转PDF再转图片，调用多模态识别
+            images = parse_word_with_vision(save_path)
+            print(f"[简历解析] Word转换完成，共{len(images)}页")
+            if images:
+                parsed_result = await volcengine_ai_service.resume_parse(images=images)
+                print(f"[简历解析] Word解析完成，耗时: {time.time() - start_time:.2f}秒")
 
         if parsed_result:
             print(f"[简历解析] 大模型返回结果: {json.dumps(parsed_result, ensure_ascii=False)[:500]}...")

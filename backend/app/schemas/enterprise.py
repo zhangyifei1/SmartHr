@@ -12,6 +12,9 @@ class EnterpriseProfileBase(BaseModel):
     website: Optional[str] = Field(None, description="公司官网")
     company_introduction: Optional[str] = Field(None, description="公司介绍")
     welfare: Optional[List[str]] = Field(None, description="公司福利")
+    contact_name: Optional[str] = Field(None, description="联系人姓名")
+    contact_phone: Optional[str] = Field(None, description="联系电话")
+    contact_email: Optional[str] = Field(None, description="联系邮箱")
 
 class EnterpriseProfileUpdate(EnterpriseProfileBase):
     pass
@@ -38,6 +41,9 @@ class EnterpriseProfileOut(BaseModel):
     welfare: Optional[List[str]]
     auth_status: int
     auth_reason: Optional[str]
+    contact_name: Optional[str]
+    contact_phone: Optional[str]
+    contact_email: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -71,6 +77,8 @@ class EnterpriseJobListItem(BaseModel):
     salary_min: int
     salary_max: int
     salary_type: int
+    education_requirement: Optional[str]
+    work_year_requirement: Optional[int]
     status: int
     view_count: int
     apply_count: int

@@ -79,13 +79,23 @@
               </el-form-item>
             </el-col>
             <el-col :span="12">
+              <el-form-item label="统一社会信用代码" prop="unified_social_credit_code">
+                <el-input v-model="profileForm.unified_social_credit_code" placeholder="请输入统一社会信用代码" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="法人姓名" prop="legal_person">
+                <el-input v-model="profileForm.legal_person" placeholder="请输入法人姓名" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
               <el-form-item label="行业" prop="industry">
                 <el-input v-model="profileForm.industry" placeholder="请输入所属行业" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="企业规模" prop="scale">
-                <el-select v-model="profileForm.scale" placeholder="请选择企业规模">
+              <el-form-item label="企业规模" prop="company_size">
+                <el-select v-model="profileForm.company_size" placeholder="请选择企业规模">
                   <el-option label="少于50人" value="少于50人" />
                   <el-option label="50-150人" value="50-150人" />
                   <el-option label="150-500人" value="150-500人" />
@@ -95,19 +105,19 @@
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="所在城市" prop="city">
-                <el-input v-model="profileForm.city" placeholder="请输入所在城市" />
+              <el-form-item label="所在城市" prop="location">
+                <el-input v-model="profileForm.location" placeholder="请输入所在城市" />
               </el-form-item>
             </el-col>
             <el-col :span="24">
-              <el-form-item label="企业地址" prop="address">
-                <el-input v-model="profileForm.address" placeholder="请输入详细地址" />
+              <el-form-item label="企业地址" prop="location">
+                <el-input v-model="profileForm.location" placeholder="请输入详细地址" />
               </el-form-item>
             </el-col>
             <el-col :span="24">
-              <el-form-item label="企业简介" prop="description">
+              <el-form-item label="企业简介" prop="company_introduction">
                 <el-input
-                  v-model="profileForm.description"
+                  v-model="profileForm.company_introduction"
                   type="textarea"
                   :rows="5"
                   placeholder="请输入企业简介"
@@ -153,10 +163,9 @@ const profileForm = ref({
   name: '',
   company_name: '',
   industry: '',
-  scale: '',
-  city: '',
-  address: '',
-  description: '',
+  company_size: '',
+  location: '',
+  company_introduction: '',
   contact_name: '',
   contact_phone: '',
   contact_email: '',
@@ -174,7 +183,10 @@ const fetchProfile = async () => {
     profileForm.value = {
       ...profileForm.value,
       ...res,
-      name: res.company_name || res.name
+      name: res.company_name || res.name,
+      company_size: res.company_size,
+      location: res.location,
+      company_introduction: res.company_introduction
     }
   } catch (error) {
     console.error('获取企业信息失败:', error)
@@ -190,8 +202,16 @@ const handleSave = async () => {
   try {
     saving.value = true
     const submitData = {
-      ...profileForm.value,
-      company_name: profileForm.value.name
+      company_name: profileForm.value.name,
+      unified_social_credit_code: profileForm.value.unified_social_credit_code,
+      legal_person: profileForm.value.legal_person,
+      industry: profileForm.value.industry,
+      company_size: profileForm.value.company_size,
+      location: profileForm.value.location,
+      company_introduction: profileForm.value.company_introduction,
+      contact_name: profileForm.value.contact_name,
+      contact_phone: profileForm.value.contact_phone,
+      contact_email: profileForm.value.contact_email
     }
     await updateProfile(submitData)
     ElMessage.success('保存成功')

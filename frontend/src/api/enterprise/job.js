@@ -69,3 +69,11 @@ export function processApplication(applicationId, status, remark) {
     data: { status, remark }
   })
 }
+
+// 一键分析所有投递简历
+export function analyzeAllApplications(jobId) {
+  return request({
+    url: `/enterprise/jobs/${jobId}/analyze-all`,
+    method: 'post'
+  })
+}

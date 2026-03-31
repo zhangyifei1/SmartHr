@@ -99,3 +99,11 @@ class InterviewQuestion(BaseModel):
     question: str
     examination_point: str
     reference_answer: str
+
+class InterviewPreparationQuestion(BaseModel):
+    question: str
+    reference_answer: str
+    key_points: List[str]
+
+class InterviewPreparationResult(BaseModel):
+    interview_questions: List[InterviewPreparationQuestion]

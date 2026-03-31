@@ -367,5 +367,27 @@ class VolcengineAIService:
         except json.JSONDecodeError:
             raise BusinessException(code=500006, message="面试题生成结果格式错误")
 
+    async def generate_interview_preparation(self, job_content: Dict) -> Dict:
+        """生成面试准备：10个面试问题、参考答案和知识点梳理"""
+        prompt = f"""
+        请根据以下岗位信息，生成面试准备内容，返回JSON对象，包含：
+        - interview_questions: 10个面试问题数组，每个问题包含：
+            * question: 问题内容
+            * reference_answer: 参考答案
+            * key_points: 知识点梳理（数组）
+
+        只返回JSON对象，不要其他解释内容。
+
+        岗位内容：
+        {json.dumps(job_content, ensure_ascii=False)}
+        """
+
+        messages = [{"role": "user", "content": prompt}]
+        result = await self._chat_completion(messages, temperature=0.7)
+        try:
+            return json.loads(result)
+        except json.JSONDecodeError:
+            raise BusinessException(code=500007, message="面试准备生成结果格式错误")
+
 # 单例实例
 volcengine_ai_service = VolcengineAIService()

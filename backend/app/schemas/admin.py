@@ -18,10 +18,11 @@ class EnterpriseAuthListItem(BaseModel):
     id: int
     user_id: int
     company_name: str
-    unified_social_credit_code: str
-    legal_person: str
-    business_license: str
+    unified_social_credit_code: Optional[str] = None
+    legal_person: Optional[str] = None
+    business_license: Optional[str] = None
     auth_status: int
+    auth_reason: Optional[str] = None
     created_at: datetime
 
     class Config:

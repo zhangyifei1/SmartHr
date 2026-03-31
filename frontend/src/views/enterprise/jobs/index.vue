@@ -45,8 +45,17 @@
           </template>
         </el-table-column>
         <el-table-column prop="work_city" label="工作城市" width="100" />
-        <el-table-column prop="education" label="学历要求" width="100" />
-        <el-table-column prop="experience" label="经验要求" width="120" />
+        <el-table-column prop="education_requirement" label="学历要求" width="100" />
+        <el-table-column label="经验要求" width="120">
+          <template #default="{ row }">
+            {{ row.work_year_requirement === null ? '不限' :
+               row.work_year_requirement === 0 ? '应届生' :
+               row.work_year_requirement === 1 ? '1-3年' :
+               row.work_year_requirement === 3 ? '3-5年' :
+               row.work_year_requirement === 5 ? '5-10年' :
+               row.work_year_requirement === 10 ? '10年以上' : '不限' }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'info'">
@@ -60,8 +69,11 @@
             {{ formatDate(row.updated_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="300" fixed="right">
+        <el-table-column label="操作" width="400" fixed="right">
           <template #default="{ row }">
+            <el-button type="success" size="small" @click="handleAnalyzeAll(row)" :loading="analyzingJobId === row.id">
+              一键分析
+            </el-button>
             <el-button size="small" @click="handleViewApplications(row)">
               投递记录({{ row.apply_count || 0 }})
             </el-button>
@@ -180,21 +192,144 @@
       </template>
     </el-dialog>
 
+    <!-- 一键分析弹窗 -->
+    <el-dialog v-model="analyzeDialogVisible" title="AI简历分析" width="900px" :close-on-click-modal="false">
+      <div class="analyze-content">
+        <div v-if="analyzing" class="analyzing-container">
+          <el-icon :size="60" color="#409eff" class="is-loading">
+            <Loading />
+          </el-icon>
+          <p style="margin-top: 20px; font-size: 16px; color: #606266;">AI正在分析简历...</p>
+          <p style="margin-top: 10px; font-size: 14px; color: #909399;">已完成 {{ analyzedCount }}/{{ totalCount }} 份</p>
+          <el-progress
+            :percentage="totalCount > 0 ? Math.round((analyzedCount / totalCount) * 100) : 0"
+            style="width: 60%; margin-top: 20px;"
+          />
+        </div>
+        <div v-else-if="analyzeResult" class="analyze-result">
+          <el-alert
+            :title="analyzeResult.message"
+            type="success"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 20px;"
+          />
+          <el-descriptions :column="2" border style="margin-bottom: 20px;">
+            <el-descriptions-item label="总份数">{{ analyzeResult.total }}</el-descriptions-item>
+            <el-descriptions-item label="成功分析">{{ analyzeResult.success }}</el-descriptions-item>
+            <el-descriptions-item label="失败份数">{{ analyzeResult.total - analyzeResult.success }}</el-descriptions-item>
+          </el-descriptions>
+
+          <!-- 综合分析报告 -->
+          <div v-if="analyzeResult.comprehensive_analysis" class="comprehensive-analysis">
+            <el-divider content-position="left">
+              <span class="divider-title">📊 综合分析报告</span>
+            </el-divider>
+
+            <!-- 整体概况 -->
+            <el-card class="analysis-card" shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span>整体概况</span>
+                </div>
+              </template>
+              <p>{{ analyzeResult.comprehensive_analysis.overview }}</p>
+            </el-card>
+
+            <!-- 候选人概况 -->
+            <el-card class="analysis-card" shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span>候选人概况分析</span>
+                </div>
+              </template>
+              <p>{{ analyzeResult.comprehensive_analysis.candidates_summary }}</p>
+            </el-card>
+
+            <!-- 推荐候选人 -->
+            <el-card v-if="analyzeResult.comprehensive_analysis.suitable_candidates && analyzeResult.comprehensive_analysis.suitable_candidates.length > 0" class="analysis-card" shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span>🌟 推荐候选人</span>
+                </div>
+              </template>
+              <el-table :data="analyzeResult.comprehensive_analysis.suitable_candidates" border size="small">
+                <el-table-column prop="name" label="姓名" width="120" />
+                <el-table-column label="匹配度" width="100">
+                  <template #default="{ row }">
+                    <el-tag :type="getMatchScoreType(row.match_score)">
+                      {{ row.match_score }}分
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="reason" label="推荐理由" />
+              </el-table>
+            </el-card>
+
+            <!-- 招聘建议 -->
+            <el-card v-if="analyzeResult.comprehensive_analysis.hiring_suggestions && analyzeResult.comprehensive_analysis.hiring_suggestions.length > 0" class="analysis-card" shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span>💡 招聘建议</span>
+                </div>
+              </template>
+              <ol>
+                <li v-for="(suggestion, index) in analyzeResult.comprehensive_analysis.hiring_suggestions" :key="index" style="margin-bottom: 8px;">
+                  {{ suggestion }}
+                </li>
+              </ol>
+            </el-card>
+
+            <!-- 风险提示 -->
+            <el-card v-if="analyzeResult.comprehensive_analysis.risk_warnings && analyzeResult.comprehensive_analysis.risk_warnings.length > 0" class="analysis-card risk-card" shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span>⚠️ 风险提示</span>
+                </div>
+              </template>
+              <ul>
+                <li v-for="(warning, index) in analyzeResult.comprehensive_analysis.risk_warnings" :key="index" style="margin-bottom: 8px;">
+                  {{ warning }}
+                </li>
+              </ul>
+            </el-card>
+          </div>
+
+          <div style="margin-top: 20px;">
+            <el-button type="primary" @click="handleViewApplications(currentAnalyzeJob)">
+              查看投递记录
+            </el-button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="analyzeDialogVisible = false" :disabled="analyzing">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 投递记录弹窗 -->
-    <el-dialog v-model="applicationsDialogVisible" title="投递记录" width="900px">
+    <el-dialog v-model="applicationsDialogVisible" title="投递记录" width="1000px">
       <el-table :data="applicationList" v-loading="applicationsLoading" border>
-        <el-table-column prop="resume_title" label="简历名称" width="200" />
-        <el-table-column prop="jobseeker_name" label="求职者姓名" width="120" />
-        <el-table-column prop="phone" label="联系方式" width="130" />
-        <el-table-column prop="email" label="邮箱" width="180" />
-        <el-table-column label="投递状态" width="120">
+        <el-table-column prop="resume_title" label="简历名称" width="150" />
+        <el-table-column prop="jobseeker_name" label="求职者姓名" width="100" />
+        <el-table-column label="匹配度" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.match_score !== null && row.match_score !== undefined" :type="getMatchScoreType(row.match_score)">
+              {{ row.match_score }}分
+            </el-tag>
+            <span v-else>未分析</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="phone" label="联系方式" width="120" />
+        <el-table-column prop="email" label="邮箱" width="160" />
+        <el-table-column label="投递状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
               {{ getStatusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="投递时间" width="180">
+        <el-table-column prop="created_at" label="投递时间" width="160">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
@@ -232,8 +367,10 @@ import {
   deleteJob,
   updateJobStatus,
   getJobApplications,
-  processApplication
+  processApplication,
+  analyzeAllApplications
 } from '@/api/enterprise/job'
+import { Loading } from '@element-plus/icons-vue'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -244,9 +381,16 @@ const total = ref(0)
 const pageSize = ref(10)
 const dialogVisible = ref(false)
 const applicationsDialogVisible = ref(false)
+const analyzeDialogVisible = ref(false)
 const jobFormRef = ref()
 const editingId = ref(null)
 const currentJobId = ref(null)
+const analyzingJobId = ref(null)
+const analyzing = ref(false)
+const analyzedCount = ref(0)
+const totalCount = ref(0)
+const analyzeResult = ref(null)
+const currentAnalyzeJob = ref(null)
 
 const searchParams = ref({
   keyword: '',
@@ -331,12 +475,17 @@ const handleEdit = (job) => {
   jobForm.value = {
     title: job.title,
     salary: salary,
-    city: job.work_city || job.city,
-    education: job.education,
-    experience: job.experience,
-    responsibilities: job.job_description || job.responsibilities,
-    requirements: job.job_requirement || job.requirements,
-    benefits: job.benefits || '',
+    city: job.work_city,
+    education: job.education_requirement,
+    experience: job.work_year_requirement === null ? '不限' :
+                job.work_year_requirement === 0 ? '应届生' :
+                job.work_year_requirement === 1 ? '1-3年' :
+                job.work_year_requirement === 3 ? '3-5年' :
+                job.work_year_requirement === 5 ? '5-10年' :
+                job.work_year_requirement === 10 ? '10年以上' : '不限',
+    responsibilities: job.job_description,
+    requirements: job.job_requirement,
+    benefits: '',
     publish_now: job.status === 1
   }
   dialogVisible.value = true
@@ -377,11 +526,15 @@ const handleSave = async () => {
       work_city: jobForm.value.city,
       salary_min: salary.min,
       salary_max: salary.max,
-      education: jobForm.value.education,
-      experience: jobForm.value.experience,
+      education_requirement: jobForm.value.education,
+      work_year_requirement: jobForm.value.experience === '不限' ? null :
+                               jobForm.value.experience === '应届生' ? 0 :
+                               jobForm.value.experience === '1-3年' ? 1 :
+                               jobForm.value.experience === '3-5年' ? 3 :
+                               jobForm.value.experience === '5-10年' ? 5 :
+                               jobForm.value.experience === '10年以上' ? 10 : null,
       job_description: jobForm.value.responsibilities,
       job_requirement: jobForm.value.requirements,
-      benefits: jobForm.value.benefits,
       status: jobForm.value.publish_now ? 1 : 0
     }
 
@@ -444,6 +597,39 @@ const handleDelete = async (job) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
     }
+  }
+}
+
+// 一键分析所有简历
+const handleAnalyzeAll = async (job) => {
+  if (!job.apply_count || job.apply_count === 0) {
+    ElMessage.warning('该岗位暂无投递简历')
+    return
+  }
+
+  try {
+    currentAnalyzeJob.value = job
+    analyzingJobId.value = job.id
+    analyzing.value = true
+    analyzedCount.value = 0
+    totalCount.value = job.apply_count
+    analyzeResult.value = null
+    analyzeDialogVisible.value = true
+
+    const res = await analyzeAllApplications(job.id)
+    analyzeResult.value = res
+    analyzedCount.value = res.success
+    totalCount.value = res.total
+
+    ElMessage.success(res.message)
+    // 刷新岗位列表
+    fetchJobList()
+  } catch (error) {
+    console.error('分析失败:', error)
+    ElMessage.error('分析失败，请稍后重试')
+  } finally {
+    analyzing.value = false
+    analyzingJobId.value = null
   }
 }
 
@@ -511,6 +697,13 @@ const getStatusText = (status) => {
   return textMap[status] || '已投递'
 }
 
+// 获取匹配度分数类型
+const getMatchScoreType = (score) => {
+  if (score >= 80) return 'success'
+  if (score >= 60) return 'warning'
+  return 'danger'
+}
+
 // 格式化日期
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
@@ -541,5 +734,88 @@ onMounted(() => {
 
 .ml-10 {
   margin-left: 10px;
+}
+
+.analyze-content {
+  min-height: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.analyzing-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.analyzing-container .el-icon.is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+.analyze-result {
+  padding: 10px 0;
+}
+
+.comprehensive-analysis {
+  margin-top: 20px;
+}
+
+.divider-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.analysis-card {
+  margin-bottom: 15px;
+}
+
+.analysis-card :deep(.el-card__header) {
+  background: #f5f7fa;
+  padding: 12px 16px;
+}
+
+.analysis-card :deep(.el-card__body) {
+  padding: 16px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: #409eff;
+}
+
+.risk-card :deep(.el-card__header) {
+  background: #fef0f0;
+}
+
+.risk-card :deep(.card-header) {
+  color: #f56c6c;
+}
+
+.analysis-card p,
+.analysis-card ol,
+.analysis-card ul {
+  margin: 0;
+  line-height: 1.6;
+  color: #606266;
+}
+
+.analysis-card ol,
+.analysis-card ul {
+  padding-left: 20px;
+}
+
+@keyframes rotating {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

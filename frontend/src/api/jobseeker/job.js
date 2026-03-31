@@ -34,3 +34,11 @@ export function getMyApplications(params) {
     params
   })
 }
+
+// 生成面试准备
+export function generateInterviewPreparation(jobId) {
+  return request({
+    url: `/jobseeker/jobs/${jobId}/interview-preparation`,
+    method: 'get'
+  })
+}

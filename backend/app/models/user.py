@@ -65,6 +65,9 @@ class EnterpriseProfile(Base):
     welfare = Column(Text, comment="公司福利JSON")
     auth_status = Column(Integer, default=0, comment="0-未认证 1-审核中 2-已认证 3-认证失败")
     auth_reason = Column(String(255))
+    contact_name = Column(String(50), comment="联系人姓名")
+    contact_phone = Column(String(20), comment="联系电话")
+    contact_email = Column(String(100), comment="联系邮箱")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

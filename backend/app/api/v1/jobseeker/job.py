@@ -4,7 +4,7 @@ from typing import List
 from app.core.database import get_db
 from app.api.dependencies import get_current_user, requires_role, ROLE_JOBSEEKER
 from app.models.user import User, JobseekerProfile
-from app.schemas.job import JobFilterParams, Job, JobListItem, JobApplicationCreate, JobApplication, MatchResult, InterviewQuestion
+from app.schemas.job import JobFilterParams, Job, JobListItem, JobApplicationCreate, JobApplication, MatchResult, InterviewQuestion, InterviewPreparationResult
 from app.services.job_service import JobService
 
 router = APIRouter(prefix="/jobs", tags=["求职者-岗位服务"])
@@ -74,6 +74,15 @@ def get_interview_questions(
 ):
     """根据岗位和简历生成面试题和参考答案"""
     return JobService.generate_interview_questions(db, job_id, resume_id)
+
+@router.get("/{job_id}/interview-preparation", response_model=InterviewPreparationResult, summary="生成面试准备")
+def get_interview_preparation(
+    job_id: int,
+    current_user: User = Depends(requires_role(ROLE_JOBSEEKER)),
+    db: Session = Depends(get_db)
+):
+    """根据岗位生成面试准备：10个面试问题、参考答案和知识点梳理"""
+    return JobService.generate_interview_preparation(db, job_id)
 
 @router.get("/applications/my", summary="获取我的投递记录")
 def get_my_applications(

@@ -37,7 +37,7 @@ class AdminService:
         db.commit()
 
     @staticmethod
-    def get_enterprise_auth_list(db: Session, status: int = None, page: int = 1, page_size: int = 10) -> Tuple[List[EnterpriseProfile], int]:
+    def get_enterprise_auth_list(db: Session, status: int = None, page: int = 1, page_size: int = 10) -> Tuple[List[dict], int]:
         """获取企业认证申请列表"""
         query = db.query(EnterpriseProfile).filter(EnterpriseProfile.auth_status != 0)
 
@@ -47,7 +47,23 @@ class AdminService:
         total = query.count()
         offset = (page - 1) * page_size
         profiles = query.order_by(EnterpriseProfile.updated_at.desc()).offset(offset).limit(page_size).all()
-        return profiles, total
+
+        # 转换为字典，确保所有字段都返回
+        result = []
+        for profile in profiles:
+            result.append({
+                "id": profile.id,
+                "user_id": profile.user_id,
+                "company_name": profile.company_name,
+                "unified_social_credit_code": profile.unified_social_credit_code,
+                "legal_person": profile.legal_person,
+                "business_license": profile.business_license,
+                "auth_status": profile.auth_status,
+                "auth_reason": profile.auth_reason,
+                "created_at": profile.created_at.isoformat() if profile.created_at else None,
+                "updated_at": profile.updated_at.isoformat() if profile.updated_at else None
+            })
+        return result, total
 
     @staticmethod
     def audit_enterprise_auth(db: Session, enterprise_id: int, status: int, reason: str = None):

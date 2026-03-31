@@ -87,6 +87,9 @@
             <p class="company-desc mt-5">{{ job.company_scale }} · {{ job.industry }}</p>
           </div>
           <div class="job-actions">
+            <el-button type="success" size="small" @click="handleInterviewPrep(job)" :loading="preparingJobId === job.id">
+              AI面试辅导
+            </el-button>
             <el-button type="primary" size="small" @click="handleApply(job)" :loading="applyingJobId === job.id">
               立即投递
             </el-button>
@@ -132,6 +135,59 @@
         <el-button type="primary" @click="confirmApply" :loading="applying">确认投递</el-button>
       </template>
     </el-dialog>
+
+    <!-- 面试准备弹窗 -->
+    <el-dialog v-model="interviewPrepDialogVisible" title="AI面试辅导" width="800px">
+      <div class="interview-prep-content">
+        <div v-if="preparing" class="loading-container">
+          <el-icon :size="60" color="#409eff" class="is-loading">
+            <Loading />
+          </el-icon>
+          <p style="margin-top: 20px; font-size: 16px; color: #606266;">AI正在为您生成面试辅导内容...</p>
+          <p style="margin-top: 10px; font-size: 14px; color: #909399;">请稍候，这可能需要10-30秒</p>
+        </div>
+        <div v-else-if="interviewPrepData && interviewPrepData.interview_questions">
+          <el-alert
+            title="以下是AI为您生成的面试辅导内容，仅供参考"
+            type="success"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 20px;"
+          />
+          <el-timeline>
+            <el-timeline-item
+              v-for="(item, index) in interviewPrepData.interview_questions"
+              :key="index"
+              :timestamp="'问题 ' + (index + 1)"
+              placement="top"
+            >
+              <el-card>
+                <h4 style="margin: 0 0 10px 0; color: #409eff;">{{ item.question }}</h4>
+                <div style="margin-bottom: 10px;">
+                  <strong>参考答案：</strong>
+                  <p style="margin: 5px 0 0 0; color: #606266; white-space: pre-wrap;">{{ item.reference_answer }}</p>
+                </div>
+                <div v-if="item.key_points && item.key_points.length > 0">
+                  <strong>知识点梳理：</strong>
+                  <el-tag
+                    v-for="(point, i) in item.key_points"
+                    :key="i"
+                    size="small"
+                    style="margin: 5px 5px 0 0;"
+                  >
+                    {{ point }}
+                  </el-tag>
+                </div>
+              </el-card>
+            </el-timeline-item>
+          </el-timeline>
+        </div>
+        <el-empty v-else description="暂无数据" />
+      </div>
+      <template #footer>
+        <el-button @click="interviewPrepDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -139,7 +195,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getJobList, applyJob } from '@/api/jobseeker/job'
+import { Loading } from '@element-plus/icons-vue'
+import { getJobList, applyJob, generateInterviewPreparation } from '@/api/jobseeker/job'
 import { getResumeList } from '@/api/jobseeker/resume'
 
 const router = useRouter()
@@ -147,13 +204,17 @@ const router = useRouter()
 const loading = ref(false)
 const applying = ref(false)
 const applyingJobId = ref(null)
+const preparing = ref(false)
+const preparingJobId = ref(null)
 const jobList = ref([])
 const resumeList = ref([])
 const total = ref(0)
 const pageSize = ref(10)
 const applyDialogVisible = ref(false)
+const interviewPrepDialogVisible = ref(false)
 const selectedResumeId = ref(null)
 const currentJob = ref(null)
+const interviewPrepData = ref(null)
 
 const searchParams = ref({
   keyword: '',
@@ -236,6 +297,25 @@ const handleApply = async (job) => {
   // 默认选择第一个简历
   selectedResumeId.value = resumeList.value[0].id
   applyDialogVisible.value = true
+}
+
+// 面试准备
+const handleInterviewPrep = async (job) => {
+  try {
+    preparingJobId.value = job.id
+    interviewPrepData.value = null
+    interviewPrepDialogVisible.value = true
+    preparing.value = true
+
+    const res = await generateInterviewPreparation(job.id)
+    interviewPrepData.value = res
+  } catch (error) {
+    console.error('生成面试辅导失败:', error)
+    ElMessage.error('生成面试辅导失败，请稍后重试')
+  } finally {
+    preparing.value = false
+    preparingJobId.value = null
+  }
 }
 
 // 确认投递
@@ -354,5 +434,32 @@ onMounted(() => {
 .pagination {
   display: flex;
   justify-content: center;
+}
+
+.interview-prep-content {
+  min-height: 200px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+.loading-container .el-icon.is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>
